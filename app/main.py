@@ -8,7 +8,7 @@ from app.router import router
 middleware = [
     Middleware(
         CORSMiddleware,
-        allow_origins=["https://app-priorisation.vercel.app/",],
+        allow_origins=["https://app-priorisation.vercel.app",],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
