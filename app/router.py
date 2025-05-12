@@ -1,5 +1,4 @@
 import os
-import asyncpg
 from fastapi import APIRouter, HTTPException
 from .pydantic_models import UserProfile
 
