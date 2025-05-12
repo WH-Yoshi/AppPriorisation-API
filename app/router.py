@@ -1,21 +1,27 @@
 import os
 import asyncpg
-from fastapi import APIRouter, Security, HTTPException
-from fastapi.security import APIKeyHeader
+from fastapi import APIRouter, HTTPException
+from .pydantic_models import UserProfile
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 router = APIRouter()
 
-API_KEY = os.getenv("API_KEY")
-API_KEY_NAME = "x-api-key"
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
-async def verify_api_key(api_key: str = Security(api_key_header)):
-    if api_key != API_KEY:
-        raise HTTPException(status_code=403, detail="Forbidden")
+@router.post("/profil-utilisateur")
+async def create_user_profile(profil: UserProfile):
+    try:
+        # Insertion dans la base de données
+        cursor.execute("INSERT INTO user_profiles (objectif_principal) VALUES (?)", (profil.objectif_principal,))
+        conn.commit()
+        return {"message": "Profil utilisateur enregistré avec succès."}
+    except Exception as e:
+        print(f"Erreur lors de l'enregistrement: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement.")
 
-@router.get("/test-db", dependencies=[Security(verify_api_key)])
+
+
+@router.get("/test-db")
 async def test_db():
     try:
         conn = await asyncpg.connect(DATABASE_URL)
