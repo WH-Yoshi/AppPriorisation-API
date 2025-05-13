@@ -1,7 +1,7 @@
 import os
 from fastapi import APIRouter, HTTPException
 import psycopg2
-from .pydantic_models import UserProfile
+from app.pydantic_models import UserProfile
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
