@@ -1,11 +1,24 @@
 import psycopg2
-from config import load_config
+from psycopg2 import connect
+
+from app.database.config import load_config
+
 
 # https://neon.tech/postgresql/postgresql-python/create-tables
 
 def create_tables():
     """Create tables in the PostgreSQL database"""
+
     commands = (
+        """
+        CREATE TABLE IF NOT EXISTS Proprietaire (
+            id SERIAL PRIMARY KEY,
+            nom VARCHAR(50) NOT NULL,
+            prenom VARCHAR(50) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            password VARCHAR(255) NOT NULL
+        )
+        """,
         """
         CREATE TABLE IF NOT EXISTS Habitation (
             id SERIAL PRIMARY KEY,
@@ -15,15 +28,7 @@ def create_tables():
             type_logement VARCHAR(50) NOT NULL,
             label_peb VARCHAR(1) NOT NULL,
             proprietaire_id INT NOT NULL,
-            FOREIGN KEY (proprietaire_id) REFERENCES Proprietaire (id),
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS Proprietaire (
-            id SERIAL PRIMARY KEY,
-            nom VARCHAR(50) NOT NULL,
-            prenom VARCHAR(50) NOT NULL,
-            email VARCHAR(255) NOT NULL,
+            FOREIGN KEY (proprietaire_id) REFERENCES Proprietaire (id)
         )
         """,
         """
@@ -47,7 +52,7 @@ def create_tables():
             liste_travaux_id INT NOT NULL,
             habitation_id INT NOT NULL,
             FOREIGN KEY (liste_travaux_id) REFERENCES Travaux (id),
-            FOREIGN KEY (habitation_id) REFERENCES Habitation (id),
+            FOREIGN KEY (habitation_id) REFERENCES Habitation (id)
         )
         """,
         """
@@ -58,7 +63,7 @@ def create_tables():
             type_travaux VARCHAR(50) NOT NULL,
             montant_max INT NOT NULL,
             conditions TEXT NOT NULL,
-            revenu_max_eligible INT NOT NULL,
+            revenu_max_eligible INT NOT NULL
         )
         """,
         """
@@ -66,18 +71,17 @@ def create_tables():
             simulation_id INT NOT NULL,
             travaux_id INT NOT NULL,
             FOREIGN KEY (simulation_id) REFERENCES Simulation (id),
-            FOREIGN KEY (travaux_id) REFERENCES Travaux (id),
+            FOREIGN KEY (travaux_id) REFERENCES Travaux (id)
         )
         """)
-    try:
-        config = load_config()
-        with psycopg2.connect(**config) as conn:
-            with conn.cursor() as cur:
-                # execute the CREATE TABLE statement
-                for command in commands:
-                    cur.execute(command)
-    except (psycopg2.DatabaseError, Exception) as error:
-        print(error)
 
-if __name__ == '__main__':
-    create_tables()
+    config = load_config()
+    try:
+        with psycopg2.connect(**config) as conn:
+            with conn.cursor() as cursor:
+                for command in commands:
+                    cursor.execute(command)
+                conn.commit()
+
+    except (psycopg2.DatabaseError, Exception) as error:
+        raise error

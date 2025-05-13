@@ -1,7 +1,7 @@
 from configparser import ConfigParser
 import os
 
-filename = os.getenv('CONFIG_FILE')
+filename = os.getenv('CONFIG_FILE') or './app/database/database.ini'
 
 def load_config(section='postgresql'):
     parser = ConfigParser()
@@ -15,6 +15,3 @@ def load_config(section='postgresql'):
         return config
     else:
         raise Exception('Section {0} not found in the {1} file'.format(section, filename))
-
-if __name__ == '__main__':
-    config = load_config()
