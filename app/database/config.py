@@ -1,5 +1,8 @@
 from configparser import ConfigParser
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 filename = os.getenv('CONFIG_FILE') or './app/database/database.ini'
 
