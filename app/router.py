@@ -1,21 +1,24 @@
 import logging
+from datetime import datetime
 
+import pymupdf
 import psycopg2
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
 from starlette import status
-from starlette.responses import Response
+from starlette.responses import Response, JSONResponse
 
-from app.auth import create_access_token, authenticate_user, SECRET_KEY, ALGORITHM, hash_password, verify_token, \
-    verify_expired_token
-from app.pydantic_models import UserProfile, ProprietaireCreate, ProprietaireLogin, HabitationCreate
+from app.auth import create_access_token, authenticate_user, SECRET_KEY, ALGORITHM, hash_password, verify_token
+from app.pydantic_models import ProprietaireCreate, ProprietaireLogin, HabitationCreate, ProjectRequest
 from app.database.config import load_config
+from app.simulation import prioritize
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
+# Authentication
 @router.post("/api/auth/login")
 def login(request: ProprietaireLogin):
     user = authenticate_user(request.email, request.password)
@@ -65,6 +68,7 @@ def refresh_token(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Impossible de rafraîchir le token.")
 
+# Projets
 @router.get("/api/projects/retrieve")
 def get_projects(payload: dict = Depends(verify_token)):
     data = []
@@ -87,11 +91,13 @@ def get_projects(payload: dict = Depends(verify_token)):
 
 @router.post("/api/projects/create")
 def create_project(
-        request: HabitationCreate,
+        request: ProjectRequest,
         payload: dict = Depends(verify_token)
 ):
     config = load_config()
     email = payload.get("sub")
+
+
     with psycopg2.connect(**config) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM proprietaire WHERE email = %s", (email,))
@@ -102,30 +108,31 @@ def create_project(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Propriétaire non trouvé."
                 )
+            proprietaire = proprietaire[0]
 
-            cur.execute(
-                "INSERT INTO habitation (nom, description, date_debut, date_fin) VALUES (%s, %s, %s, %s)",
-                (request.nom, request.description, request.date_debut, request.date_fin)
-            )
-            conn.commit()
+    prioritize(request)
+
+    #         cur.execute(
+    #             """
+    #             INSERT INTO habitation (nom, description, objectif, region, annee_construction, surface,
+    #                                     type_habitation, label_peb, type_chauffage, temperature_moyenne,
+    #                                     theromstat_programmable, type_fenetre, isolation_mur, isolation_toit,
+    #                                     isolation_sol, revenu_menage, nombre_enfants, methode_renovation, proprietaire_id)
+    #             """,
+    #             (request.nom, request.description, request.objectif, request.region, request.annee_construction,
+    #              request.surface, request.type_habitation, request.label_peb, request.type_chauffage,
+    #              request.temperature_moyenne, request.thermostat_programmable, request.type_fenetre,
+    #              request.isolation_mur, request.isolation_toit, request.isolation_sol, request.revenu_menage,
+    #              request.nombre_enfants, request.methode_renovation, proprietaire[0])
+    #         )
+    #         now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    #         cur.execute(
+    #             """
+    #             INSERT INTO simulation (date, budget_max, liste_travaux_id, habitation_id)
+    #             VALUES (%s, %s, %s, %s, %s)
+    #             """,
+    #             (now, request.budget_max, request.liste_travaux_id, request.habitation_id)
+    #         )
+    #     conn.commit()
     return {"message": "Projet créé avec succès."}
 
-@router.post("/profil-utilisateur")
-async def create_user_profile(profil: UserProfile):
-
-    print(profil)
-
-    sql = """
-        SELECT * FROM proprietaire
-    """
-
-    config = load_config()
-    try:
-        with psycopg2.connect(**config) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(sql)
-    except Exception as e:
-        logging.error("Erreur lors de l'enregistrement: %s", e)
-        raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement.")
-
-    Response(content="Profil utilisateur enregistré avec succès.", status_code=200)
