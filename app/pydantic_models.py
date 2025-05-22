@@ -1,12 +1,12 @@
 from pydantic import BaseModel, EmailStr
 
-class ProprietaireCreate(BaseModel):
+class OwnerCreate(BaseModel):
     email: EmailStr
     password: str
     nom: str
     prenom: str
 
-class ProprietaireLogin(BaseModel):
+class OwnerLogin(BaseModel):
     email: EmailStr
     password: str
 
@@ -14,16 +14,18 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
-class HabitationCreate(BaseModel):
+class DwellingCreate(BaseModel):
     nom: str
     description: str
     region: str
-    annee_construction: int
+    constructionYear: int
     surface: int
-    type_logement: str
-    label_peb: str
+    housingType: str
+    pebLabel: str
 
-class LogementData(BaseModel):
+class HousingData(BaseModel):
+    surface: str
+    roofType: str
     heatingType: str
     averageTemperature: str
     programmableThermostat: str
@@ -35,13 +37,22 @@ class LogementData(BaseModel):
 class BudgetData(BaseModel):
     totalBudget: str
     householdIncome: str
-    householdSize: str
+    childNumber: str
     propertyType: str
     renovationMethod: str
+    floorNumber: str
+
+class TechnicalData(BaseModel):
+    hasSolarPanels: str
+    hasWaterHeater: str
+    boilerType: str
+    ventilationType: str
 
 class ProjectRequest(BaseModel):
     name: str
     description: str
     profilData: str
-    logementData: LogementData
+    region: str
+    housingData: HousingData
     budgetData: BudgetData
+    technicalData: TechnicalData

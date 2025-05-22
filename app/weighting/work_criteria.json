@@ -1,0 +1,12 @@
+{
+  "Toiture": ["Isolation thermique", "Modernisation des infrastructures"],
+  "Murs": ["Isolation thermique", "Confort et bien-être"],
+  "Sols": ["Isolation thermique", "Confort et bien-être"],
+  "Menuiseries": ["Isolation thermique", "Modernisation des infrastructures"],
+  "Chauffage": ["Économies d'énergie", "Durabilité environnementale"],
+  "Eau chaude": ["Économies d'énergie", "Durabilité environnementale"],
+  "Salubrité": ["Confort et bien-être", "Durabilité environnementale"],
+  "Ventilation": ["Confort et bien-être", "Durabilité environnementale"],
+  "Augmentation rendement chauffage": ["Économies d'énergie", "Durabilité environnementale", "Modernisation des infrastructures"],
+  "Augmentation rendement eau chaude": ["Économies d'énergie", "Durabilité environnementale", "Modernisation des infrastructures"]
+}

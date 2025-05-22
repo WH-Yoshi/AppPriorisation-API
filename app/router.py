@@ -1,17 +1,15 @@
 import logging
-from datetime import datetime
 
-import pymupdf
 import psycopg2
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
-from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from starlette import status
-from starlette.responses import Response, JSONResponse
 
-from app.auth import create_access_token, authenticate_user, SECRET_KEY, ALGORITHM, hash_password, verify_token
-from app.pydantic_models import ProprietaireCreate, ProprietaireLogin, HabitationCreate, ProjectRequest
+from app.auth import create_access_token, authenticate_user, SECRET_KEY, ALGORITHM, hash_password, verify_user
+from app.database.calls import retrieve_owner
 from app.database.config import load_config
+from app.pydantic_models import OwnerCreate, OwnerLogin, ProjectRequest
 from app.simulation import prioritize
 
 router = APIRouter()
@@ -20,7 +18,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Authentication
 @router.post("/api/auth/login")
-def login(request: ProprietaireLogin):
+def login(request: OwnerLogin):
     user = authenticate_user(request.email, request.password)
     if not user:
         logging.error("Authentication failed for user: %s", request.email)
@@ -33,27 +31,26 @@ def login(request: ProprietaireLogin):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/api/auth/register", status_code=201)
-def register_user(request: ProprietaireCreate):
+def register_user(request: OwnerCreate):
     hashed_password = hash_password(request.password)
 
     config = load_config()
     with psycopg2.connect(**config) as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM Proprietaire WHERE email = %s", (request.email,))
+            cur.execute("SELECT * FROM Owner WHERE email = %s", (request.email,))
             if cur.fetchone():
                 logging.error("User already exists")
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail="L'utilisateur existe déjà."
+                    detail="User already exists",
                 )
 
             cur.execute(
-                "INSERT INTO Proprietaire (email, password, nom, prenom) VALUES (%s, %s, %s, %s)",
+                "INSERT INTO Owner (email, password, name, firstname) VALUES (%s, %s, %s, %s)",
                 (request.email, hashed_password, request.nom, request.prenom)
             )
             conn.commit()
-
-    return {"message": "Utilisateur créé avec succès."}
+    logging.info("User registered successfully: %s", request.email)
 
 @router.post("/api/auth/refresh")
 def refresh_token(token: str = Depends(oauth2_scheme)):
@@ -61,78 +58,71 @@ def refresh_token(token: str = Depends(oauth2_scheme)):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
         email = payload.get("sub")
         if not email:
-            raise HTTPException(status_code=401, detail="Token invalide.")
+            raise HTTPException(status_code=401, detail="Invalid token.")
+        verify_user(email)
 
         new_token = create_access_token({"sub": email})
         return {"access_token": new_token, "token_type": "bearer"}
     except JWTError:
-        raise HTTPException(status_code=401, detail="Impossible de rafraîchir le token.")
+        raise HTTPException(status_code=401, detail="Cannot refresh token.")
 
-# Projets
+
+# Project Management
 @router.get("/api/projects/retrieve")
-def get_projects(payload: dict = Depends(verify_token)):
+def get_projects(owner: int = Depends(retrieve_owner)):
     data = []
-    email = payload.get("sub")
-    config = load_config()
 
+    # TODO: Change this as well as the database
+    config = load_config()
     with psycopg2.connect(**config) as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM habitation")
+            cur.execute("SELECT * FROM test")
             rows = cur.fetchall()
             for row in rows:
-                data.append({
+                project = {
                     "id": row[0],
                     "nom": row[1],
                     "description": row[2],
-                    "date_debut": row[3],
-                    "date_fin": row[4]
-                })
+                    "details": row[3]
+                }
+                data.append(project)
     return data
+
+@router.get("/api/projects/{project_id}")
+def get_project(project_id: int, owner: int = Depends(retrieve_owner)):
+    # TODO: Change this as well as the database
+    config = load_config()
+    with psycopg2.connect(**config) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM test WHERE id = %s", (project_id,))
+            row = cur.fetchone()
+            if not row:
+                logging.error("Project not found: %s", project_id)
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Projet non trouvé."
+                )
+            project = {
+                "id": row[0],
+                "nom": row[1],
+                "description": row[2],
+                "details": row[3]
+            }
+    return project
 
 @router.post("/api/projects/create")
 def create_project(
         request: ProjectRequest,
-        payload: dict = Depends(verify_token)
+        owner: int = Depends(retrieve_owner)
 ):
+    dataframe = prioritize(request)
     config = load_config()
-    email = payload.get("sub")
 
-
+    # TODO: Change this as well as the database
     with psycopg2.connect(**config) as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM proprietaire WHERE email = %s", (email,))
-            proprietaire = cur.fetchone()
-            if not proprietaire:
-                logging.error("Proprietaire not found for email: %s", email)
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Propriétaire non trouvé."
-                )
-            proprietaire = proprietaire[0]
+            cur.execute("""
+            INSERT INTO test (nom, description, details) VALUES (%s, %s, %s)
+            """, (request.name, request.description, dataframe.to_json(orient="records")))
 
-    prioritize(request)
-
-    #         cur.execute(
-    #             """
-    #             INSERT INTO habitation (nom, description, objectif, region, annee_construction, surface,
-    #                                     type_habitation, label_peb, type_chauffage, temperature_moyenne,
-    #                                     theromstat_programmable, type_fenetre, isolation_mur, isolation_toit,
-    #                                     isolation_sol, revenu_menage, nombre_enfants, methode_renovation, proprietaire_id)
-    #             """,
-    #             (request.nom, request.description, request.objectif, request.region, request.annee_construction,
-    #              request.surface, request.type_habitation, request.label_peb, request.type_chauffage,
-    #              request.temperature_moyenne, request.thermostat_programmable, request.type_fenetre,
-    #              request.isolation_mur, request.isolation_toit, request.isolation_sol, request.revenu_menage,
-    #              request.nombre_enfants, request.methode_renovation, proprietaire[0])
-    #         )
-    #         now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    #         cur.execute(
-    #             """
-    #             INSERT INTO simulation (date, budget_max, liste_travaux_id, habitation_id)
-    #             VALUES (%s, %s, %s, %s, %s)
-    #             """,
-    #             (now, request.budget_max, request.liste_travaux_id, request.habitation_id)
-    #         )
-    #     conn.commit()
-    return {"message": "Projet créé avec succès."}
-
+    return dataframe.to_json(orient="records")

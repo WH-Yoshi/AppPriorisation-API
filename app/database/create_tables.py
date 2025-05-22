@@ -9,91 +9,74 @@ def create_tables():
 
     commands = (
         """
-        CREATE TABLE IF NOT EXISTS Proprietaire (
+        CREATE TABLE IF NOT EXISTS Owner (
             id SERIAL PRIMARY KEY,
-            nom VARCHAR(50) NOT NULL,
-            prenom VARCHAR(50) NOT NULL,
+            name VARCHAR(50) NOT NULL,
+            firstname VARCHAR(50) NOT NULL,
             email VARCHAR(255) NOT NULL UNIQUE,
             password VARCHAR(255) NOT NULL
         )
         """,
         """
-        CREATE TABLE IF NOT EXISTS Habitation (
+        CREATE TABLE IF NOT EXISTS Home (
             id SERIAL PRIMARY KEY,
-            nom VARCHAR(50) NOT NULL,
+            name VARCHAR(50) NOT NULL,
             description TEXT NOT NULL,
-            objectif VARCHAR(50) NOT NULL,
+            profile VARCHAR(50) NOT NULL,
             region VARCHAR(255) NOT NULL,
-            annee_construction INT NOT NULL,
-            surface INT NOT NULL,
-            type_logement VARCHAR(50) NOT NULL,
-            label_peb VARCHAR(1) NOT NULL,
-            type_chauffage VARCHAR(50) NOT NULL,
-            temperature_moyenne INT NOT NULL,
-            thermostat_programmable BOOLEAN NOT NULL,
-            type_fenetre VARCHAR(50) NOT NULL,
-            isolation_mur BOOLEAN NOT NULL,
-            isolation_toit BOOLEAN NOT NULL,
-            isolation_sol BOOLEAN NOT NULL,
-            revenu_menage INT NOT NULL,
-            nombre_enfants INT NOT NULL,
-            methode_renovation VARCHAR(50) NOT NULL,
-            proprietaire_id INT NOT NULL,
-            FOREIGN KEY (proprietaire_id) REFERENCES Proprietaire (id)
+            construction_year VARCHAR(50) NULL,
+            surface VARCHAR(50) NOT NULL,
+            roof_type VARCHAR(50) NOT NULL,
+            housing_type VARCHAR(50) NOT NULL,
+            peb_label VARCHAR(1) NULL,
+            heating_type VARCHAR(50) NOT NULL,
+            average_temp VARCHAR(50) NOT NULL,
+            programmable_thermostat VARCHAR(50) NOT NULL,
+            windows_type VARCHAR(50) NOT NULL,
+            wall_insulation VARCHAR(50) NOT NULL,
+            roof_insulation VARCHAR(50) NOT NULL,
+            floor_insulation VARCHAR(50) NOT NULL,
+            house_income VARCHAR(50) NOT NULL,
+            child_number VARCHAR(50) NOT NULL,
+            renovation_method VARCHAR(50) NOT NULL,
+            floor_number VARCHAR(50) NOT NULL,
+            has_solar_panels VARCHAR(50) NOT NULL,
+            has_water_heater VARCHAR(50) NOT NULL,
+            boiler_type VARCHAR(50) NOT NULL,
+            ventilation_type VARCHAR(50) NOT NULL,
+            onwer_id INT NOT NULL,
+            FOREIGN KEY (onwer_id) REFERENCES Owner (id)
         )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS Travaux (
-            id SERIAL PRIMARY KEY,
-            nom VARCHAR(50) NOT NULL,
-            description TEXT NOT NULL,
-            type_travaux VARCHAR(50) NOT NULL,
-            cout_estime INT NOT NULL,
-            prime_estime INT NULL,
-            habitation_id INT NOT NULL,
-            FOREIGN KEY (habitation_id) REFERENCES Habitation (id)
-        )    
         """,
         """
         CREATE TABLE IF NOT EXISTS Simulation (
             id SERIAL PRIMARY KEY,
             date VARCHAR(50) NOT NULL,
-            budget_max INT NOT NULL,
-            liste_travaux_id INT NOT NULL,
-            habitation_id INT NOT NULL,
-            FOREIGN KEY (liste_travaux_id) REFERENCES Travaux (id),
-            FOREIGN KEY (habitation_id) REFERENCES Habitation (id)
+            details JSONB,
+            home_id INT NOT NULL,
+            FOREIGN KEY (home_id) REFERENCES Home (id)
         )
         """,
         """
-        CREATE TABLE IF NOT EXISTS Prime (
-            id SERIAL PRIMARY KEY,
-            nom VARCHAR(50) NOT NULL,
-            description TEXT NOT NULL,
-            type_travaux VARCHAR(50) NOT NULL,
-            montant_max INT NOT NULL,
-            conditions TEXT NOT NULL,
-            revenu_max_eligible INT NOT NULL
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS Simulation_Travaux (
-            simulation_id INT NOT NULL,
-            travaux_id INT NOT NULL,
-            FOREIGN KEY (simulation_id) REFERENCES Simulation (id),
-            FOREIGN KEY (travaux_id) REFERENCES Travaux (id)
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS Liste_Travaux (
+        CREATE TABLE IF NOT EXISTS Work_list (
             id SERIAL PRIMARY KEY,
             genre VARCHAR(50) NOT NULL,
             description TEXT NOT NULL,
-            prime_estime FLOAT NULL,
-            par_surface BOOLEAN NOT NULL,
+            estimated_prime FLOAT NULL,
+            is_prime_by_surface BOOLEAN NOT NULL,
+            estimated_cost FLOAT NOT NULL,
+            is_cost_by_surface BOOLEAN NOT NULL,
             UNIQUE(genre, description)
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS Test (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(50) NOT NULL,
+            description TEXT NOT NULL,
+            details JSONB
+        )
+        """
         )
 
     config = load_config()
@@ -115,23 +98,21 @@ def insert_data():
         with psycopg2.connect(**config) as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    INSERT INTO Liste_Travaux 
-                        (genre, description, prime_estime, par_surface) 
+                    INSERT INTO Work_list 
+                        (genre, description, estimated_prime, is_prime_by_surface, estimated_cost, is_cost_by_surface)
                     VALUES 
-                        ('Toiture', 'Remplacement de la couverture', 4, TRUE),
-                        ('Toiture', 'Appropriation de la charpente', 100, FALSE),
-                        ('Toiture', 'Remplacement d’un dispositif de collecte et d’évacuation des eaux pluviales', 40, FALSE),
-                        ('Toiture', 'Isolation thermique du toit ou des combles', 20, TRUE),
-                        ('Murs', 'Assèchement des murs – infiltration', 2.4, TRUE),
-                        ('Murs', 'Assèchement des murs – humidité ascensionnelle', 3.2, TRUE),
-                        ('Murs', 'Renforcement/reconstruction des murs instables', 3.2, TRUE),
-                        ('Murs', 'Isolation thermique des murs', 8.8, TRUE),
-                        ('Sols', ' Isolation thermique des sols', 6, TRUE),
-                        ('Menuiseries', 'Remplacement des menuiseries extérieures ou revitrage', 26, TRUE),
-                        ('Chauffage', 'Pompe à chaleur', 600, FALSE),
-                        ('Chauffage', 'Chaudière biomasse', 720, FALSE),
-                        ('Eau chaude', 'Pompe à chaleur', 280, FALSE),
-                        ('Eau chaude', 'Chauffe-eau solaire', 420, FALSE)
+                        ('Toiture', 'Remplacement de la couverture', 4, TRUE, 70.0, TRUE),
+                        ('Toiture', 'Appropriation de la charpente', 100, FALSE, 95.0, TRUE),
+                        ('Toiture', 'Isolation thermique du toit ou des combles', 20, TRUE, 40.0, TRUE),
+                        ('Murs', 'Isolation thermique des murs', 8.8, TRUE, 125.0, TRUE),
+                        ('Sols', 'Isolation thermique des sols', 6, TRUE, 35.0, TRUE),
+                        ('Menuiseries et Vitrage', 'Remplacement des menuiseries extérieures ou revitrage', 26, TRUE, 100.0, TRUE),
+                        ('Chauffage', 'Pompe à chaleur', 600, FALSE, 10000.0, FALSE),
+                        ('Chauffage', 'Chaudière biomasse', 720, FALSE, 12500, FALSE),
+                        ('Chauffage', 'Programmable Thermostat', 16, FALSE, 100.0, FALSE),
+                        ('Eau chaude', 'Pompe à chaleur', 280, FALSE, 7500.0, FALSE),
+                        ('Eau chaude', 'Chauffe-eau solaire', 420, FALSE, 5000.0, FALSE),
+                        ('Energie', 'Installation de panneaux photovoltaïques', 0, FALSE, 7000.0, FALSE)
                     ON CONFLICT (genre, description) DO NOTHING
                 """)
             conn.commit()

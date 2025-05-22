@@ -1,6 +1,6 @@
+import datetime
 import logging
 import os
-import datetime
 from datetime import timedelta
 
 import psycopg2
@@ -9,6 +9,8 @@ from fastapi import HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError, ExpiredSignatureError
 from passlib.context import CryptContext
+from pydantic import EmailStr
+from starlette import status
 
 from app.database.config import load_config
 
@@ -38,24 +40,44 @@ def authenticate_user(email: str, password: str):
     try:
         with psycopg2.connect(**config) as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT id, password FROM Proprietaire WHERE email = %s", (email,))
+                cur.execute("SELECT id, password FROM Owner WHERE email = %s", (email,))
                 user = cur.fetchone()
                 if user and verify_password(password, user[1]):
                     return {"id": user[0], "email": email}
                 return None
     except Exception as e:
         logging.error(e)
-        raise HTTPException(status_code=500, detail="Erreur lors de l'authentification.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Could not authenticate user.")
+
+def verify_user(email: EmailStr):
+    config = load_config()
+    with psycopg2.connect(**config) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM Owner WHERE email = %s", (email,))
+            user = cur.fetchone()
+            if not user:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
 def verify_token(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        payload.get("sub")
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token.")
+
+        config = load_config()
+        with psycopg2.connect(**config) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM Owner WHERE email = %s", (email,))
+                user = cur.fetchone()
+                if not user:
+                    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
+
         return payload
     except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expiré.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Expired.")
     except JWTError:
-        raise HTTPException(status_code=401, detail="Token invalide.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid.")
 
 def verify_expired_token(token: str) -> bool:
     try:
@@ -64,4 +86,4 @@ def verify_expired_token(token: str) -> bool:
     except ExpiredSignatureError:
         return True
     except JWTError:
-        raise HTTPException(status_code=401, detail="Token invalide.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid.")
