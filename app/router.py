@@ -81,7 +81,7 @@ def get_projects(owner: int = Depends(retrieve_owner)):
             for row in rows:
                 project = {
                     "id": row[0],
-                    "nom": row[1],
+                    "name": row[1],
                     "description": row[2],
                     "details": row[3]
                 }
