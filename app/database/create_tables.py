@@ -109,10 +109,11 @@ def insert_data():
                         ('Menuiseries et Vitrage', 'Remplacement des menuiseries extérieures ou revitrage', 26, TRUE, 100.0, TRUE),
                         ('Chauffage', 'Pompe à chaleur', 600, FALSE, 10000.0, FALSE),
                         ('Chauffage', 'Chaudière biomasse', 720, FALSE, 12500, FALSE),
-                        ('Chauffage', 'Programmable Thermostat', 16, FALSE, 100.0, FALSE),
+                        ('Chauffage', 'Thermostat Programmable', 16, FALSE, 100.0, FALSE),
                         ('Eau chaude', 'Pompe à chaleur', 280, FALSE, 7500.0, FALSE),
                         ('Eau chaude', 'Chauffe-eau solaire', 420, FALSE, 5000.0, FALSE),
-                        ('Energie', 'Installation de panneaux photovoltaïques', 0, FALSE, 7000.0, FALSE)
+                        ('Energie', 'Installation de panneaux photovoltaïques', 0, FALSE, 7000.0, FALSE),
+                        ('Ventilation', 'Ventilation double flux avec échangeur thermique', 680, FALSE, 5500.0, FALSE)
                     ON CONFLICT (genre, description) DO NOTHING
                 """)
             conn.commit()

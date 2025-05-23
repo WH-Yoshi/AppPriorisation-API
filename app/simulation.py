@@ -95,29 +95,29 @@ class PrioritizationSystem:
         Returns:
             Dictionary of weighting factors
         """
-        profil_factors = {
+        profile_factors = {
             "Eco-friendly": {
-                'Environmental sustainability': 1.2,
-                'Renewable energy production': 1.2,
-                'Thermal insulation': 1.1
+                'Durabilité environnementale': 1.2,
+                'Production d\'énergie renouvelable': 1.2,
+                'Isolation thermique': 1.1
             },
             "Economy": {
-                'Energy savings': 1.2,
-                'Thermal insulation': 1.1,
-                'Infrastructure modernization': 1.1
+                'Économies d\'énergie': 1.2,
+                'Isolation thermique': 1.1,
+                'Modernisation des infrastructures': 1.1
             },
             "Valuation": {
-                'Increase in property value': 1.3,
-                'Infrastructure modernization': 1.2
+                'Augmentation de la valeur immobilière': 1.3,
+                'Modernisation des infrastructures': 1.2
             },
             "Comfort": {
-                'Comfort and well-being': 1.3,
-                'Thermal insulation': 1.2,
-                'Infrastructure modernization': 1.1
+                'Confort et bien-être': 1.3,
+                'Isolation thermique': 1.2,
+                'Modernisation des infrastructures': 1.1
             }
         }
 
-        return profil_factors.get(self.project_data['profileData'], {})
+        return profile_factors.get(self.project_data['profileData'], {})
 
     def _calculate_roof_surface(self) -> float:
         """
@@ -180,32 +180,32 @@ class PrioritizationSystem:
         logement_data = self.project_data['housingData']
 
         # Adjustments for heating
-        if logement_data.get('heatingType') != "heat_pump":
+        if logement_data.get('heatingType') != "pompe_a_chaleur":
             mask = df['Description'] == "Heat pump"
             df.loc[mask, 'Score'] += (
-                    self.weights.get('Environmental sustainability', 0) *
-                    self.profile_factors.get('Environmental sustainability', 1)
+                    self.weights.get('Durabilité environnementale', 0) *
+                    self.profile_factors.get('Durabilité environnementale', 1)
             )
         else:
             df.loc[df['Description'] == "Heat pump", 'Score'] = 0
 
         # Adjustment for programmable thermostat
-        if logement_data.get('programmableThermostat') == "no":
-            mask = df['Description'] == "Programmable Thermostat"
+        if logement_data.get('programmableThermostat') == "non":
+            mask = df['Description'] == "Thermostat Programmable"
             df.loc[mask, 'Score'] += (
-                    self.weights.get('Energy savings', 0) *
-                    self.profile_factors.get('Energy savings', 1)
+                    self.weights.get('Économies d\'énergie', 0) *
+                    self.profile_factors.get('Économies d\'énergie', 1)
             )
         else:
-            df.loc[df['Description'] == "Programmable Thermostat", 'Score'] = 0
+            df.loc[df['Description'] == "Thermostat Programmable", 'Score'] = 0
 
         # Adjustments for temperature
         if logement_data.get('averageTemperature') == "<18":
             adjustments = [
-                ("Programmable Thermostat", 'Energy savings'),
-                ("Wall thermal insulation", 'Comfort and well-being'),
-                ("Roof or attic thermal insulation", 'Thermal insulation'),
-                ("Floor thermal insulation", 'Comfort and well-being')
+                ("Thermostat Programmable", 'Économies d\'énergie'),
+                ("Isolation thermique des murs", 'Confort et bien-être'),
+                ("Isolation thermique du toit ou des combles", 'Isolation thermique'),
+                ("Isolation thermique des sols", 'Confort et bien-être')
             ]
 
             for desc, factor_key in adjustments:
@@ -216,25 +216,25 @@ class PrioritizationSystem:
                 )
 
         # Adjustments for insulation
-        if logement_data.get('wallInsulation') == "no":
-            mask = df['Description'] == "Wall thermal insulation"
+        if logement_data.get('wallInsulation') == "non":
+            mask = df['Description'] == "Isolation thermique des murs"
             df.loc[mask, 'Score'] += (
-                    self.weights.get('Thermal insulation', 0) *
-                    self.profile_factors.get('Thermal insulation', 1)
+                    self.weights.get('Isolation thermique', 0) *
+                    self.profile_factors.get('Isolation thermique', 1)
             )
 
-        if logement_data.get('roofInsulation') == "no":
-            mask = df['Description'] == "Roof or attic thermal insulation"
+        if logement_data.get('roofInsulation') == "non":
+            mask = df['Description'] == "Isolation thermique du toit ou des combles"
             df.loc[mask, 'Score'] += (
-                    self.weights.get('Thermal insulation', 0) *
-                    self.profile_factors.get('Thermal insulation', 1)
+                    self.weights.get('Isolation thermique', 0) *
+                    self.profile_factors.get('Isolation thermique', 1)
             )
 
-        if logement_data.get('floorInsulation') == "no":
-            mask = df['Description'] == "Floor thermal insulation"
+        if logement_data.get('floorInsulation') == "non":
+            mask = df['Description'] == "Isolation thermique des sols"
             df.loc[mask, 'Score'] += (
-                    self.weights.get('Thermal insulation', 0) *
-                    self.profile_factors.get('Thermal insulation', 1)
+                    self.weights.get('Isolation thermique', 0) *
+                    self.profile_factors.get('Isolation thermique', 1)
             )
 
         return df
@@ -264,12 +264,12 @@ class PrioritizationSystem:
         property_type = budget_data.get('propertyType')
         if property_type == "house":
             df['Score'] = df.apply(
-                lambda x: x['Score'] * 1.1 if x['Type'] in ["Roofing", "Walls", "Floors"] else x['Score'],
+                lambda x: x['Score'] * 1.1 if x['Type'] in ["Toiture", "Murs", "Sols"] else x['Score'],
                 axis=1
             )
         elif property_type == "apartment":
             df['Score'] = df.apply(
-                lambda x: x['Score'] * 0.9 if x['Type'] == "Roofing" else x['Score'],
+                lambda x: x['Score'] * 0.9 if x['Type'] == "Toiture" else x['Score'],
                 axis=1
             )
 
@@ -277,12 +277,12 @@ class PrioritizationSystem:
         renovation_method = budget_data.get('renovationMethod')
         if renovation_method == "professional":
             df['Score'] = df.apply(
-                lambda x: x['Score'] * 1.1 if x['Type'] in ["Heating", "Joinery"] else x['Score'],
+                lambda x: x['Score'] * 1.1 if x['Type'] in ["Chauffage", "Menuiseries et Vitrages"] else x['Score'],
                 axis=1
             )
         elif renovation_method == "do_it_yourself":
             df['Score'] = df.apply(
-                lambda x: x['Score'] * 0.9 if x['Type'] == "Heating" else x['Score'],
+                lambda x: x['Score'] * 0.9 if x['Type'] == "Chauffage" else x['Score'],
                 axis=1
             )
 
@@ -299,32 +299,34 @@ class PrioritizationSystem:
             DataFrame with scores adjusted according to technical characteristics
         """
         # Example of technical adjustment
-        if self.project_data['technicalData']['hasSolarPanels'] == "yes":
-            mask = df['Description'] == "Installation of photovoltaic panels"
+        if self.project_data['technicalData']['hasSolarPanels'] == "non":
+            mask = df['Description'] == "Installation de panneaux photovoltaïques"
             df.loc[mask, 'Score'] += (
-                    self.weights.get('Renewable energy production', 0) *
-                    self.profile_factors.get('Renewable energy production', 1)
+                    self.weights.get('Production d\'énergie renouvelable', 0) *
+                    self.profile_factors.get('Production d\'énergie renouvelable', 1)
             )
 
-        if self.project_data['technicalData']['hasWaterHeater'] == "yes":
-            mask = df['Description'] == "Solar water heater"
+        if self.project_data['technicalData']['hasWaterHeater'] == "non":
+            mask = df['Description'] == "Chauffe-eau solaire"
             df.loc[mask, 'Score'] += (
-                    self.weights.get('Environmental sustainability', 0) *
-                    self.profile_factors.get('Environmental sustainability', 1)
+                    self.weights.get('Durabilité environnementale', 0) *
+                    self.profile_factors.get('Durabilité environnementale', 1)
             )
 
-        if self.project_data['technicalData']['boilerType'] != "heat_pump":
-            mask = (df['Description'] == "Heat pump") & (df['Type'] == "Hot water")
+        if self.project_data['technicalData']['boilerType'] != "pompe_a_chaleur":
+            mask = (df['Description'] == "Pompe à chaleur") & (df['Type'] == "Eau chaude")
             df.loc[mask, 'Score'] += (
-                    self.weights.get('Environmental sustainability', 0) *
-                    self.profile_factors.get('Environmental sustainability', 1)
+                    self.weights.get('Durabilité environnementale', 0) *
+                    self.profile_factors.get('Durabilité environnementale', 1)
             )
 
-        if self.project_data['technicalData']['ventilationType'] not in ["mechanical", "double_flow"]:
-            mask = df['Description'] == "Controlled mechanical ventilation"
+        if self.project_data['technicalData']['ventilationType'] not in ["mechanique", "double_flux"]:
+            mask = df['Description'] == "Ventilation double flux avec échangeur thermique"
             df.loc[mask, 'Score'] += (
-                    self.weights.get('Energy savings', 0) *
-                    self.profile_factors.get('Energy savings', 1)
+                    self.weights.get('Confort et bien-être', 0) * self.profile_factors.get('Confort et bien-être', 1)
+            )
+            df.loc[mask, 'Score'] += (
+                self.weights.get('Économies d\'énergie', 0) * self.profile_factors.get('Économies d\'énergie', 1)
             )
 
         return df
@@ -339,34 +341,34 @@ class PrioritizationSystem:
         Returns:
             DataFrame with calculated eligible grants
         """
-        surface_totale = int(self.project_data['housingData']['surface'])
+        total_surface = int(self.project_data['housingData']['surface'])
         floor_number = int(self.project_data['budgetData']['floorNumber'])
         wall_surface = self._calculate_wall_surface(floor_number)
         roof_surface = self._calculate_roof_surface()
 
-        plafonds = {
+        ceilings = {
             'R1': 0.7,
             'R2': 0.7,
             'R3': 0.5,
             'R4': 0.5
         }
-        plafond = plafonds.get(self.income_category, 0)
+        ceiling = ceilings.get(self.income_category, 0)
 
         def prime_eligible(row):
             prime = row['Estimated Grant'] * self.prime_multiplier
-            surface = wall_surface if row['Type'] == "Walls" else (roof_surface if row['Type'] == "Roofing" else surface_totale)
+            surface = wall_surface if row['Type'] == "Murs" else (roof_surface if row['Type'] == "Toiture" else total_surface)
 
             if row['Grant by surface?']:
                 if row['Cost by surface?']:
-                    prime_max = (row['Estimated Cost'] * surface) * plafond
+                    prime_max = (row['Estimated Cost'] * surface) * ceiling
                 else:
-                    prime_max = row['Estimated Cost'] * plafond
+                    prime_max = row['Estimated Cost'] * ceiling
                 prime = prime * surface
             else:
                 if row['Cost by surface?']:
-                    prime_max = (row['Estimated Cost'] * surface) * plafond
+                    prime_max = (row['Estimated Cost'] * surface) * ceiling
                 else:
-                    prime_max = row['Estimated Cost'] * plafond
+                    prime_max = row['Estimated Cost'] * ceiling
 
             return min(prime, prime_max)
 
