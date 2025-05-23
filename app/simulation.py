@@ -24,9 +24,9 @@ class PrioritizationSystem:
         self.weights = self._load_weights()
         self.income_category, self.prime_multiplier = self._calculate_income_category()
         print(f"Income category: {self.income_category}, Grant multiplier: {self.prime_multiplier}")
-        self.travaux_df = self._load_travaux_from_db()
-        self.profil_factors = self._get_profil_factors()
-        self.travaux_criteria = self._load_travaux_criteria()
+        self.works_df = self._load_work_from_db()
+        self.profile_factors = self._get_profile_factors()
+        self.works_criteria = self._load_works_criteria()
 
     def _load_weights(self) -> Dict[str, float]:
         """
@@ -40,7 +40,7 @@ class PrioritizationSystem:
         total = sum(raw_weights.values())
         return {k: v / total for k, v in raw_weights.items()}
 
-    def _load_travaux_criteria(self) -> Dict[str, List[str]]:
+    def _load_works_criteria(self) -> Dict[str, List[str]]:
         """
         Loads criteria associated with each type of work.
         
@@ -57,21 +57,21 @@ class PrioritizationSystem:
         Returns:
             Tuple containing the income category and multiplier
         """
-        revenu = int(self.project_data['budgetData']['householdIncome'])
-        nbr_enfants = int(self.project_data['budgetData']['householdSize'])
-        revenu = revenu - (5000 * nbr_enfants)
+        income = int(self.project_data['budgetData']['householdIncome'])
+        child_nbr = int(self.project_data['budgetData']['childNumber'])
+        income = income - (5000 * child_nbr)
 
         with open("app/weighting/incomes.json", 'r') as f:
             revenus = json.load(f)
 
-        multiplicateurs = {'R1': 6, 'R2': 4, 'R3': 3, 'R4': 2}
-        for categorie, seuil in revenus.items():
-            if revenu <= seuil:
-                return categorie, multiplicateurs[categorie]
+        multiplier = {'R1': 6, 'R2': 4, 'R3': 3, 'R4': 2}
+        for category, threshold in revenus.items():
+            if income <= threshold:
+                return category, multiplier[category]
 
         return "Not applicable", 0
 
-    def _load_travaux_from_db(self) -> pd.DataFrame:
+    def _load_work_from_db(self) -> pd.DataFrame:
         """
         Loads the list of works from the database.
         
@@ -88,7 +88,7 @@ class PrioritizationSystem:
 
         return pd.DataFrame(travaux, columns=["Type", "Description", "Estimated Grant", "Grant by surface?", "Estimated Cost", "Cost by surface?"])
 
-    def _get_profil_factors(self) -> Dict[str, float]:
+    def _get_profile_factors(self) -> Dict[str, float]:
         """
         Gets the weighting factors associated with the chosen user profile.
         
@@ -106,7 +106,7 @@ class PrioritizationSystem:
                 'Thermal insulation': 1.1,
                 'Infrastructure modernization': 1.1
             },
-            "Valorization": {
+            "Valuation": {
                 'Increase in property value': 1.3,
                 'Infrastructure modernization': 1.2
             },
@@ -117,7 +117,7 @@ class PrioritizationSystem:
             }
         }
 
-        return profil_factors.get(self.project_data['profilData'], {})
+        return profil_factors.get(self.project_data['profileData'], {})
 
     def _calculate_roof_surface(self) -> float:
         """
@@ -126,8 +126,8 @@ class PrioritizationSystem:
         Returns:
             Roof surface in m²
         """
-        floor_surface = int(self.project_data['logementData']['surface'])
-        roof_type = self.project_data['logementData']['roofType']
+        floor_surface = int(self.project_data['housingData']['surface'])
+        roof_type = self.project_data['housingData']['roofType']
         floor_length = floor_width = math.sqrt(floor_surface)
 
         if roof_type == "flat":
@@ -150,26 +150,26 @@ class PrioritizationSystem:
         Returns:
             DataFrame with calculated base scores
         """
-        df = self.travaux_df.copy()
+        df = self.works_df.copy()
         df['Score'] = 0.0
 
         for idx, row in df.iterrows():
             genre = row['Type']
-            criteres = self.travaux_criteria.get(genre, [])
+            criteres = self.works_criteria.get(genre, [])
 
             score_total = 0
             for critere in criteres:
                 base_score = self.weights.get(critere, 0)
-                facteur = self.profil_factors.get(critere, 1)
+                facteur = self.profile_factors.get(critere, 1)
                 score_total += base_score * facteur
 
             df.at[idx, 'Score'] = score_total
 
         return df
 
-    def _apply_logement_adjustments(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _apply_housing_adjustments(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Applies score adjustments based on dwelling characteristics.
+        Applies score adjustments based on housing characteristics.
         
         Args:
             df: DataFrame of works with base scores
@@ -177,14 +177,14 @@ class PrioritizationSystem:
         Returns:
             DataFrame with adjusted scores
         """
-        logement_data = self.project_data['logementData']
+        logement_data = self.project_data['housingData']
 
         # Adjustments for heating
         if logement_data.get('heatingType') != "heat_pump":
             mask = df['Description'] == "Heat pump"
             df.loc[mask, 'Score'] += (
                     self.weights.get('Environmental sustainability', 0) *
-                    self.profil_factors.get('Environmental sustainability', 1)
+                    self.profile_factors.get('Environmental sustainability', 1)
             )
         else:
             df.loc[df['Description'] == "Heat pump", 'Score'] = 0
@@ -194,7 +194,7 @@ class PrioritizationSystem:
             mask = df['Description'] == "Programmable Thermostat"
             df.loc[mask, 'Score'] += (
                     self.weights.get('Energy savings', 0) *
-                    self.profil_factors.get('Energy savings', 1)
+                    self.profile_factors.get('Energy savings', 1)
             )
         else:
             df.loc[df['Description'] == "Programmable Thermostat", 'Score'] = 0
@@ -212,7 +212,7 @@ class PrioritizationSystem:
                 mask = df['Description'] == desc
                 df.loc[mask, 'Score'] += (
                         self.weights.get(factor_key, 0) *
-                        self.profil_factors.get(factor_key, 1)
+                        self.profile_factors.get(factor_key, 1)
                 )
 
         # Adjustments for insulation
@@ -220,21 +220,21 @@ class PrioritizationSystem:
             mask = df['Description'] == "Wall thermal insulation"
             df.loc[mask, 'Score'] += (
                     self.weights.get('Thermal insulation', 0) *
-                    self.profil_factors.get('Thermal insulation', 1)
+                    self.profile_factors.get('Thermal insulation', 1)
             )
 
         if logement_data.get('roofInsulation') == "no":
             mask = df['Description'] == "Roof or attic thermal insulation"
             df.loc[mask, 'Score'] += (
                     self.weights.get('Thermal insulation', 0) *
-                    self.profil_factors.get('Thermal insulation', 1)
+                    self.profile_factors.get('Thermal insulation', 1)
             )
 
         if logement_data.get('floorInsulation') == "no":
             mask = df['Description'] == "Floor thermal insulation"
             df.loc[mask, 'Score'] += (
                     self.weights.get('Thermal insulation', 0) *
-                    self.profil_factors.get('Thermal insulation', 1)
+                    self.profile_factors.get('Thermal insulation', 1)
             )
 
         return df
@@ -303,28 +303,28 @@ class PrioritizationSystem:
             mask = df['Description'] == "Installation of photovoltaic panels"
             df.loc[mask, 'Score'] += (
                     self.weights.get('Renewable energy production', 0) *
-                    self.profil_factors.get('Renewable energy production', 1)
+                    self.profile_factors.get('Renewable energy production', 1)
             )
 
         if self.project_data['technicalData']['hasWaterHeater'] == "yes":
             mask = df['Description'] == "Solar water heater"
             df.loc[mask, 'Score'] += (
                     self.weights.get('Environmental sustainability', 0) *
-                    self.profil_factors.get('Environmental sustainability', 1)
+                    self.profile_factors.get('Environmental sustainability', 1)
             )
 
         if self.project_data['technicalData']['boilerType'] != "heat_pump":
             mask = (df['Description'] == "Heat pump") & (df['Type'] == "Hot water")
             df.loc[mask, 'Score'] += (
                     self.weights.get('Environmental sustainability', 0) *
-                    self.profil_factors.get('Environmental sustainability', 1)
+                    self.profile_factors.get('Environmental sustainability', 1)
             )
 
         if self.project_data['technicalData']['ventilationType'] not in ["mechanical", "double_flow"]:
             mask = df['Description'] == "Controlled mechanical ventilation"
             df.loc[mask, 'Score'] += (
                     self.weights.get('Energy savings', 0) *
-                    self.profil_factors.get('Energy savings', 1)
+                    self.profile_factors.get('Energy savings', 1)
             )
 
         return df
@@ -339,7 +339,7 @@ class PrioritizationSystem:
         Returns:
             DataFrame with calculated eligible grants
         """
-        surface_totale = int(self.project_data['logementData']['surface'])
+        surface_totale = int(self.project_data['housingData']['surface'])
         floor_number = int(self.project_data['budgetData']['floorNumber'])
         wall_surface = self._calculate_wall_surface(floor_number)
         roof_surface = self._calculate_roof_surface()
@@ -388,7 +388,7 @@ class PrioritizationSystem:
         df = self._calculate_base_scores()
 
         # Apply adjustments based on dwelling
-        df = self._apply_logement_adjustments(df)
+        df = self._apply_housing_adjustments(df)
 
         # Apply adjustments based on budget
         df = self._apply_budget_adjustments(df)
@@ -417,7 +417,7 @@ class PrioritizationSystem:
         Returns:
             Wall surface in m²
         """
-        floor_surface = int(self.project_data['logementData']['surface'])
+        floor_surface = int(self.project_data['housingData']['surface'])
         wall_height = 2.5
         floor_circumference = math.sqrt(floor_surface) * 4
         return floor_circumference * wall_height * floor_number

@@ -51,7 +51,7 @@ class TechnicalData(BaseModel):
 class ProjectRequest(BaseModel):
     name: str
     description: str
-    profilData: str
+    profileData: str
     region: str
     housingData: HousingData
     budgetData: BudgetData

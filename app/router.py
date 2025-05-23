@@ -122,7 +122,7 @@ def create_project(
     with psycopg2.connect(**config) as conn:
         with conn.cursor() as cur:
             cur.execute("""
-            INSERT INTO test (nom, description, details) VALUES (%s, %s, %s)
+            INSERT INTO test (name, description, details) VALUES (%s, %s, %s)
             """, (request.name, request.description, dataframe.to_json(orient="records")))
 
     return dataframe.to_json(orient="records")
