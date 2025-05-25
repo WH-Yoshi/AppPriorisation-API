@@ -111,7 +111,8 @@ def get_project(project_id: int, owner: int = Depends(retrieve_owner)):
                 "id": row[0],
                 "nom": row[1],
                 "description": row[2],
-                "details": row[3]
+                "owner_id": row[3],
+                "details": row[4]
             }
     return project
 
