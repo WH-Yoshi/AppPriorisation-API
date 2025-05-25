@@ -23,7 +23,6 @@ class PrioritizationSystem:
         self.project_data = project_data.model_dump()
         self.weights = self._load_weights()
         self.income_category, self.prime_multiplier = self._calculate_income_category()
-        print(f"Income category: {self.income_category}, Grant multiplier: {self.prime_multiplier}")
         self.works_df = self._load_work_from_db()
         self.profile_factors = self._get_profile_factors()
         self.works_criteria = self._load_works_criteria()
@@ -438,8 +437,5 @@ def prioritize(project_data: ProjectRequest) -> pd.DataFrame:
     insert_project(project_data)
     system = PrioritizationSystem(project_data)
     prioritized_works = system.prioritize()
-
-    print("\nList of prioritized works:\n")
-    print(prioritized_works.to_string(index=False))
 
     return prioritized_works
