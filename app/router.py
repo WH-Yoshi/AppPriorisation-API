@@ -128,7 +128,7 @@ def create_project(
         with conn.cursor() as cur:
             cur.execute("""
             INSERT INTO test (name, description, details, owner_id) VALUES (%s, %s, %s, %s)
-            """, (request.name, request.description, dataframe.to_json(orient="records")), owner)
+            """, (request.name, request.description, dataframe.to_json(orient="records"), owner))
 
     return dataframe.to_json(orient="records")
 
