@@ -5,14 +5,15 @@ from datetime import timedelta
 
 import psycopg2
 from dotenv import load_dotenv
-from fastapi import HTTPException, Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import HTTPException, Depends, Security
+from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 from jose import jwt, JWTError, ExpiredSignatureError
 from passlib.context import CryptContext
 from pydantic import EmailStr
 from starlette import status
 
 from app.database.config import load_config
+from app.pydantic_models import TokenData
 
 load_dotenv()
 
@@ -36,18 +37,10 @@ def create_access_token(data: dict):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def authenticate_user(email: str, password: str):
-    config = load_config()
-    try:
-        with psycopg2.connect(**config) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id, password FROM Owner WHERE email = %s", (email,))
-                user = cur.fetchone()
-                if user and verify_password(password, user[1]):
-                    return {"id": user[0], "email": email}
-                return None
-    except Exception as e:
-        logging.error(e)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Could not authenticate user.")
+    user = get_user_with_role(email)
+    if not user or not verify_password(password, user["password"]):
+        return None
+    return user
 
 def verify_user(email: EmailStr):
     config = load_config()
@@ -87,3 +80,39 @@ def verify_expired_token(token: str) -> bool:
         return True
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid.")
+
+def get_user_with_role(email: str):
+    config = load_config()
+    with psycopg2.connect(**config) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT email, password, is_admin FROM Owner WHERE email = %s", (email,))
+            user = cur.fetchone()
+            if user:
+                return {
+                    "email": user[0],
+                    "password": user[1],
+                    "is_admin": user[2]
+                }
+    return None
+
+async def get_current_user(
+        token: str = Depends(oauth2_scheme)
+):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        is_admin: bool = payload.get("is_admin", False)
+        if email is None:
+            raise HTTPException(status_code=401, detail="Token invalide")
+        token_data = TokenData(email=email, is_admin=is_admin)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token invalide")
+    return token_data
+
+def check_admin(user: TokenData = Security(get_current_user)):
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Permission refusée : accès administrateur requis"
+        )
+    return user

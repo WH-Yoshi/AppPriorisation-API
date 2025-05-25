@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 
 import psycopg2
 from fastapi import APIRouter, HTTPException, Depends
@@ -6,7 +8,8 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from starlette import status
 
-from app.auth import create_access_token, authenticate_user, SECRET_KEY, ALGORITHM, hash_password, verify_user
+from app.auth import create_access_token, authenticate_user, SECRET_KEY, ALGORITHM, hash_password, verify_user, \
+    check_admin, verify_token
 from app.database.calls import retrieve_owner
 from app.database.config import load_config
 from app.pydantic_models import OwnerCreate, OwnerLogin, ProjectRequest
@@ -21,14 +24,16 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 def login(request: OwnerLogin):
     user = authenticate_user(request.email, request.password)
     if not user:
-        logging.error("Authentication failed for user: %s", request.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Identifiants incorrects",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = create_access_token(data={"sub": user["email"]})
-    return {"access_token": access_token, "token_type": "bearer"}
+    access_token = create_access_token(
+        data={"sub": user["email"], "is_admin": user["is_admin"]}
+    )
+    return {"access_token": access_token, "token_type": "bearer", "is_admin": user["is_admin"]}
+
 
 @router.post("/api/auth/register", status_code=201)
 def register_user(request: OwnerCreate):
@@ -126,3 +131,39 @@ def create_project(
             """, (request.name, request.description, dataframe.to_json(orient="records")))
 
     return dataframe.to_json(orient="records")
+
+@router.get("/api/admin/weighting", dependencies=[Depends(check_admin)])
+def get_weighting_files():
+    try:
+        weighting_path = "app/weighting"
+        json_files = []
+
+        for filename in os.listdir(weighting_path):
+            if filename.endswith('.json'):
+                file_path = os.path.join(weighting_path, filename)
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = json.load(f)
+                    json_files.append({
+                        "filename": filename,
+                        "content": content
+                    })
+
+        return json_files
+    except Exception as e:
+        logging.error(f"Erreur lors de la lecture des fichiers JSON : {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erreur lors de la récupération des fichiers de pondération"
+        )
+
+@router.get("/api/auth/check-admin")
+async def check_admin_status(payload: dict = Depends(verify_token)):
+    try:
+        is_admin = payload.get("is_admin", False)
+        return {"is_admin": is_admin}
+    except JWTError as e:
+        logging.error("Token verification failed: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide"
+        )

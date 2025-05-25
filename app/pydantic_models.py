@@ -14,6 +14,10 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+class TokenData(BaseModel):
+    email: str
+    is_admin: bool = False
+
 class DwellingCreate(BaseModel):
     nom: str
     description: str
