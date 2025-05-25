@@ -75,7 +75,9 @@ def create_tables():
             id SERIAL PRIMARY KEY,
             name VARCHAR(50) NOT NULL,
             description TEXT NOT NULL,
-            details JSONB
+            owner_id INT NOT NULL,
+            details JSONB,
+            FOREIGN KEY (owner_id) REFERENCES Owner (id) ON DELETE CASCADE
         )
         """
         )

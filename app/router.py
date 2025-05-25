@@ -81,7 +81,7 @@ def get_projects(owner: int = Depends(retrieve_owner)):
     config = load_config()
     with psycopg2.connect(**config) as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM test")
+            cur.execute("SELECT * FROM test where owner_id = %s", (owner,))
             rows = cur.fetchall()
             for row in rows:
                 project = {
